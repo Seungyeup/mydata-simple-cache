@@ -1,0 +1,55 @@
+classDiagram
+direction LR
+
+namespace com.mydata.cache {
+  class ApiCaches {
+    +apiEndpointCache()
+    +apiEndpointCache(DMdcCacheMng, Input)
+    +apiEndpointCache(DMdcCacheMng, Input, CacheReloadLogPublisher)
+  }
+  class DMdcCacheMng
+  class Input
+  class DbioDto
+  class ApiCommonMeta
+  class ApiEndpointMetadataSnapshot
+  class ApiEndpointRoutingSnapshot
+  class CacheReloadLogPublisher
+  class NoopCacheReloadLogPublisher
+  class CacheReloadLogSupport
+}
+
+namespace com.mydata.cache.apicache {
+  class ApiCommonMetaLoader
+  class DefaultApiCommonMetaLoader
+  class ApiCommonMetaCache {
+    +snapshot()
+    +snapshot(DMdcCacheMng, Input)
+    +reloadOrThrow(DMdcCacheMng, Input)
+    +tryReload(DMdcCacheMng, Input)
+  }
+  class CacheReloadException
+}
+
+ApiCaches ..> DMdcCacheMng
+ApiCaches ..> Input
+ApiCaches ..> DbioDto
+ApiCaches ..> CacheReloadLogPublisher
+ApiCaches ..> com.mydata.cache.apicache.ApiCommonMetaCache : creates
+ApiCaches ..> DefaultApiCommonMetaLoader
+
+ApiCommonMeta *-- ApiEndpointMetadataSnapshot
+ApiCommonMeta *-- ApiEndpointRoutingSnapshot
+NoopCacheReloadLogPublisher ..|> CacheReloadLogPublisher
+
+ApiCommonMetaLoader <|.. DefaultApiCommonMetaLoader
+ApiCommonMetaCache --> ApiCommonMetaLoader
+ApiCommonMetaCache --> ApiCommonMeta
+ApiCommonMetaCache ..> CacheReloadLogPublisher
+ApiCommonMetaCache ..> CacheReloadLogSupport
+ApiCommonMetaCache ..> NoopCacheReloadLogPublisher
+ApiCommonMetaCache ..> ApiCaches
+DefaultApiCommonMetaLoader ..> ApiCaches
+DefaultApiCommonMetaLoader --> ApiCommonMeta
+DefaultApiCommonMetaLoader ..> ApiEndpointMetadataSnapshot
+DefaultApiCommonMetaLoader ..> ApiEndpointRoutingSnapshot
+ApiCommonMetaCache ..> CacheReloadException

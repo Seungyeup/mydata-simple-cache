@@ -1,8 +1,8 @@
 package com.mydata.cache;
 
-final class NoopCacheReloadLogPublisher implements CacheReloadLogPublisher {
+public final class NoopCacheReloadLogPublisher implements CacheReloadLogPublisher {
 
-    static final NoopCacheReloadLogPublisher INSTANCE = new NoopCacheReloadLogPublisher();
+    public static final NoopCacheReloadLogPublisher INSTANCE = new NoopCacheReloadLogPublisher();
 
     private NoopCacheReloadLogPublisher() {
     }

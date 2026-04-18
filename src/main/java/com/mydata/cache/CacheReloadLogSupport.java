@@ -2,7 +2,7 @@ package com.mydata.cache;
 
 import java.nio.charset.StandardCharsets;
 
-final class CacheReloadLogSupport {
+public final class CacheReloadLogSupport {
 
     static final String TOPIC = "MDC_CACHE_LOG";
     private static final int MAX_MESSAGE_BYTES = 900 * 1024;
@@ -10,7 +10,7 @@ final class CacheReloadLogSupport {
     private CacheReloadLogSupport() {
     }
 
-    static void publishSafely(CacheReloadLogPublisher publisher, String message) {
+    public static void publishSafely(CacheReloadLogPublisher publisher, String message) {
         if (publisher == null || message == null) {
             return;
         }
@@ -21,7 +21,7 @@ final class CacheReloadLogSupport {
         }
     }
 
-    static String toJson(String cacheName,
+    public static String toJson(String cacheName,
                          String reloadType,
                          boolean success,
                          long startedAtEpochMillis,
