@@ -1,0 +1,65 @@
+sequenceDiagram
+    autonumber
+    actor Caller
+    participant ApiCaches
+    participant ApiCommonMetaCache
+    participant Loader as DefaultApiCommonMetaLoader
+    participant DMdcCacheMng
+    participant SnapshotRef as AtomicReference<ApiCommonMeta>
+    participant Log as CacheReloadLogSupport
+
+    rect rgb(235, 245, 255)
+        Note over Caller,ApiCaches: 1) 최초 캐시 생성 경로
+        Caller->>ApiCaches: apiEndpointCache(dMdcCacheMng, input)
+        ApiCaches->>ApiCaches: API_ENDPOINT_CACHE_REF.get()
+        alt 캐시가 이미 존재함
+            ApiCaches-->>Caller: existing cache 반환
+        else 캐시가 아직 없음
+            ApiCaches->>ApiCaches: synchronized(API_ENDPOINT_INIT_LOCK)
+            ApiCaches->>ApiCaches: API_ENDPOINT_CACHE_REF.get() 재확인
+            ApiCaches->>ApiCommonMetaCache: new ApiCommonMetaCache(loader, publisher)
+            ApiCaches->>ApiCommonMetaCache: reloadOrThrow(dMdcCacheMng, input)
+            ApiCommonMetaCache->>ApiCommonMetaCache: reloadLock.lock()
+            ApiCommonMetaCache->>Loader: loadSnapshot(dMdcCacheMng, input)
+            Loader->>DMdcCacheMng: selectApiMetaInfoList00(input.getApiCode())
+            DMdcCacheMng-->>Loader: List<DbioDto>
+            Loader-->>ApiCommonMetaCache: ApiCommonMeta
+            ApiCommonMetaCache->>ApiCommonMetaCache: sanitizeAndFreeze(loaded)
+            ApiCommonMetaCache->>SnapshotRef: set(next snapshot)
+            ApiCommonMetaCache->>Log: publishSafely(MANUAL_RELOAD_OR_THROW log)
+            ApiCommonMetaCache-->>ApiCaches: 초기 적재된 cache
+            ApiCaches->>ApiCaches: API_ENDPOINT_CACHE_REF.set(cache)
+            ApiCaches-->>Caller: initialized cache 반환
+        end
+    end
+
+    rect rgb(245, 255, 235)
+        Note over Caller,ApiCommonMetaCache: 2) TTL 지난 후 조회 경로
+        Caller->>ApiCommonMetaCache: snapshot(dMdcCacheMng, input)
+        ApiCommonMetaCache->>ApiCommonMetaCache: tryReloadIfExpired(dMdcCacheMng, input)
+        ApiCommonMetaCache->>ApiCommonMetaCache: lastSuccessfulReloadEpochMillis 확인
+        alt TTL이 아직 유효함
+            ApiCommonMetaCache->>SnapshotRef: get()
+            SnapshotRef-->>ApiCommonMetaCache: current snapshot
+            ApiCommonMetaCache-->>Caller: current snapshot 반환
+        else TTL 만료됨
+            ApiCommonMetaCache->>ApiCommonMetaCache: reloadLock.tryLock()
+            alt 다른 스레드가 리로드 중
+                ApiCommonMetaCache->>SnapshotRef: get()
+                SnapshotRef-->>ApiCommonMetaCache: existing snapshot
+                ApiCommonMetaCache-->>Caller: 기존 snapshot 반환
+            else 현재 스레드가 리로드 수행
+                ApiCommonMetaCache->>ApiCommonMetaCache: TTL 재확인
+                ApiCommonMetaCache->>Loader: loadSnapshot(dMdcCacheMng, input)
+                Loader->>DMdcCacheMng: selectApiMetaInfoList00(input.getApiCode())
+                DMdcCacheMng-->>Loader: List<DbioDto>
+                Loader-->>ApiCommonMetaCache: ApiCommonMeta
+                ApiCommonMetaCache->>ApiCommonMetaCache: sanitizeAndFreeze(loaded)
+                ApiCommonMetaCache->>SnapshotRef: set(next snapshot)
+                ApiCommonMetaCache->>Log: publishSafely(AUTO_TTL log)
+                ApiCommonMetaCache->>SnapshotRef: get()
+                SnapshotRef-->>ApiCommonMetaCache: refreshed snapshot
+                ApiCommonMetaCache-->>Caller: refreshed snapshot 반환
+            end
+        end
+    end
